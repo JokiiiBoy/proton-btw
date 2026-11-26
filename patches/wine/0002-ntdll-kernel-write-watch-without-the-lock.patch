@@ -1,0 +1,40 @@
+ntdll: NtGetWriteWatch and NtResetWriteWatch on a range the kernel tracks leave
+virtual_mutex before scanning, so other threads' memory calls do not wait for the scan.
+
+diff --git a/dlls/ntdll/unix/virtual.c b/dlls/ntdll/unix/virtual.c
+index 1cf3efc..8badbfb 100644
+--- a/dlls/ntdll/unix/virtual.c
++++ b/dlls/ntdll/unix/virtual.c
+@@ -7150,6 +7150,17 @@ NTSTATUS WINAPI NtGetWriteWatch( HANDLE process, ULONG flags, PVOID base, SIZE_T
+ 
+     server_enter_uninterrupted_section( &virtual_mutex, &sigset );
+ 
++    if (use_kernel_writewatch && !enable_write_exceptions && is_write_watch_range( base, size ))
++    {
++        /* The kernel tracks the written pages: the scan (and its reset) needs no lock of ours,
++         * only the check that this is a write-watched view. Other threads' allocations,
++         * protections and queries no longer wait for it, nor do other threads' scans. */
++        server_leave_uninterrupted_section( &virtual_mutex, &sigset );
++        kernel_get_write_watches( base, size, addresses, count, flags & WRITE_WATCH_FLAG_RESET );
++        *granularity = page_size;
++        return STATUS_SUCCESS;
++    }
++
+     if (is_write_watch_range( base, size ))
+     {
+         ULONG_PTR pos = 0;
+@@ -7203,6 +7214,14 @@ NTSTATUS WINAPI NtResetWriteWatch( HANDLE process, PVOID base, SIZE_T size )
+ 
+     server_enter_uninterrupted_section( &virtual_mutex, &sigset );
+ 
++    if (use_kernel_writewatch && !enable_write_exceptions && is_write_watch_range( base, size ))
++    {
++        /* as in NtGetWriteWatch: the kernel's reset needs no lock of ours */
++        server_leave_uninterrupted_section( &virtual_mutex, &sigset );
++        kernel_writewatch_reset( base, size );
++        return STATUS_SUCCESS;
++    }
++
+     if (is_write_watch_range( base, size ))
+         reset_write_watches( base, size );
+     else

@@ -1,0 +1,33 @@
+ntdll: WINE_INT3_NO_REWIND=1 leaves Rip after an int3 instead of rewinding it onto the
+instruction (for a program that steps over int3 itself).
+
+diff --git a/dlls/ntdll/unix/signal_x86_64.c b/dlls/ntdll/unix/signal_x86_64.c
+index f1da0de..7691626 100644
+--- a/dlls/ntdll/unix/signal_x86_64.c
++++ b/dlls/ntdll/unix/signal_x86_64.c
+@@ -1630,7 +1630,11 @@ static void setup_raise_exception( ucontext_t *sigcontext, EXCEPTION_RECORD *rec
+     }
+ 
+     /* fix up instruction pointer in context for EXCEPTION_BREAKPOINT */
+-    if (rec->ExceptionCode == EXCEPTION_BREAKPOINT) context->Rip--;
++    if (rec->ExceptionCode == EXCEPTION_BREAKPOINT) {
++        static int skip = -1;
++        if (skip == -1) skip = getenv("WINE_INT3_NO_REWIND") ? 1 : 0; /* not VICTORY_SKIP_INT3: VIctory steps over int3 itself and would skip twice */
++        if (!skip) context->Rip--;
++    }
+ 
+     rsp = is_16bit(sigcontext) ? get_wow_teb( NtCurrentTeb() )->SystemReserved1[0] : RSP_sig(sigcontext);
+     rsp &= ~(ULONG_PTR)15;
+@@ -1769,7 +1773,11 @@ NTSTATUS call_user_exception_dispatcher( EXCEPTION_RECORD *rec, CONTEXT *context
+ 
+     stack->rec = *rec;
+     /* fix up instruction pointer in context for EXCEPTION_BREAKPOINT */
+-    if (stack->rec.ExceptionCode == EXCEPTION_BREAKPOINT) stack->context.Rip--;
++    if (stack->rec.ExceptionCode == EXCEPTION_BREAKPOINT) {
++        static int skip = -1;
++        if (skip == -1) skip = getenv("WINE_INT3_NO_REWIND") ? 1 : 0; /* not VICTORY_SKIP_INT3: VIctory steps over int3 itself and would skip twice */
++        if (!skip) stack->context.Rip--;
++    }
+     stack->machine_frame.rip = stack->context.Rip;
+     stack->machine_frame.rsp = stack->context.Rsp;
+     frame->rbp = stack->context.Rbp;

@@ -1,0 +1,4 @@
+# Sources fetched by build.sh, the build folder and local settings
+/Proton/
+/build/
+/build.env

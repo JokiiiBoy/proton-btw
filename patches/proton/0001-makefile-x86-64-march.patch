@@ -1,0 +1,19 @@
+Makefile.in: X86_64_MARCH sets the CPU target of the 64-bit build (default: Valve's
+-march=nocona -mtune=core-avx2).
+
+diff --git a/Makefile.in b/Makefile.in
+index 61aacdce..3b3aec8a 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -52,7 +52,10 @@ DEPLOY_DIR := ./deploy
+ REDIST_DIR := ./redist
+ 
+ i386_CFLAGS    := -mstackrealign -march=nocona -mtune=core-avx2 -mfpmath=sse
+-x86_64_CFLAGS  := -mcmodel=small -march=nocona -mtune=core-avx2 -mfpmath=sse
++# X86_64_MARCH: CPU target of the 64-bit build, e.g. -march=znver4 for a build used on one
++# Zen 4 machine only (the default runs on any x86-64 CPU with SSE3).
++X86_64_MARCH   ?= -march=nocona -mtune=core-avx2
++x86_64_CFLAGS  := -mcmodel=small $(X86_64_MARCH) -mfpmath=sse
+ aarch64_CFLAGS := -march=armv8.2-a -mtune=cortex-x3
+ arm64ec_CFLAGS := -march=armv8.2-a -mtune=cortex-x3
+ 
